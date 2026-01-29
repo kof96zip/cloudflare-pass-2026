@@ -110,7 +110,7 @@ def bypass_cloudflare(
                 
                 # 保存Cookie
                 if save_cookies:
-                    save_dir = Path("output/cookies")
+                    save_dir = Path("/app/output/cookies")
                     save_dir.mkdir(parents=True, exist_ok=True)
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                     

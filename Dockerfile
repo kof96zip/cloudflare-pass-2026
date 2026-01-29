@@ -18,6 +18,7 @@ RUN apt-get update -qq && apt-get install -y -qq \
     libxcomposite1 \
     libxdamage1 \
     libxfixes3 \
+    libxfixes3 \
     libxrandr2 \
     libgbm1 \
     libasound2 \
@@ -41,8 +42,10 @@ COPY . .
 
 # 4. 安装 Python 依赖
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install pyvirtualdisplay seleniumbase loguru
+# 在此处增加了 streamlit 依赖，用于实现你要求的可视化 UI
+RUN pip install pyvirtualdisplay seleniumbase loguru streamlit
 
 # 5. 启动命令
-# 使用 xvfb-run 运行，并添加服务器参数防止显示错误
-CMD ["xvfb-run", "--server-args=-screen 0 1920x1080x24", "python", "simple_bypass.py", "https://nowsecure.nl"]
+# 修改说明：根据你的要求，将启动方式改为运行 streamlit 界面，从而实现可视化操作
+# 端口设置为 8080 以符合 Zeabur 的默认网络配置
+CMD ["streamlit", "run", "app.py", "--server.port", "8080", "--server.address", "0.0.0.0"]

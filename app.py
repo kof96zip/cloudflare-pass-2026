@@ -2,50 +2,83 @@ import streamlit as st
 import json
 import os
 import subprocess
+import time
 
-CONFIG_FILE = "/app/output/tasks_config.json" # 存放在挂载的持久化目录
+# 配置文件存放在持久化目录
+CONFIG_FILE = "/app/output/tasks_config.json"
 
-# --- 核心功能：保存与读取配置 ---
 def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
-    return []
+    # 默认初始项目
+    return [{"name": "Katabump续期", "script": "katabump_renew.py", "email": "", "password": "", "freq": 3, "active": True}]
 
 def save_config(tasks):
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(tasks, f, ensure_ascii=False, indent=2)
 
-# --- 初始化任务 ---
+st.set_page_config(page_title="自动化任务管理器", layout="wide")
+st.title("🤖 多项目自动化续期管理中心")
+
 if 'tasks' not in st.session_state:
     st.session_state.tasks = load_config()
 
-# --- 主 UI 界面 ---
-st.title("🤖 自动化任务管理器 (支持自动保存)")
+# --- 侧边栏：添加新脚本 ---
+with st.sidebar:
+    st.header("➕ 添加新项目")
+    new_name = st.text_input("项目备注名称")
+    # 自动识别你截图里的那些文件名
+    available_scripts = ["katabump_renew.py", "bypass.py", "bypass_seleniumbase.py", "simple_bypass.py"]
+    new_script = st.selectbox("关联脚本文件", available_scripts)
+    
+    if st.button("添加至列表"):
+        st.session_state.tasks.append({"name": new_name, "script": new_script, "email": "", "password": "", "freq": 3, "active": True})
+        save_config(st.session_state.tasks)
+        st.success("已添加！")
 
-# 遍历任务并创建输入框
-new_task_list = []
+# --- 主界面：配置区 ---
+updated_tasks = []
+st.subheader("📋 任务列表 (配置自动保存)")
+
 for i, task in enumerate(st.session_state.tasks):
-    with st.expander(f"任务: {task.get('name', '未命名')}", expanded=True):
-        c1, c2, c3, c4 = st.columns(4)
-        task['email'] = c1.text_input("账号", value=task.get('email', ''), key=f"e_{i}")
-        task['password'] = c2.text_input("密码", type="password", value=task.get('password', ''), key=f"p_{i}")
-        task['freq'] = c3.number_input("周期(天)", value=task.get('freq', 3), key=f"f_{i}")
-        task['active'] = c4.checkbox("启用", value=task.get('active', True), key=f"a_{i}")
-        new_task_list.append(task)
+    with st.expander(f"项目: {task['name']} (调用 {task['script']})", expanded=True):
+        col1, col2, col3, col4, col5 = st.columns([1, 2, 2, 1, 1])
+        task['active'] = col1.checkbox("启用", value=task.get('active', True), key=f"active_{i}")
+        task['email'] = col2.text_input("账号", value=task.get('email', ''), key=f"email_{i}")
+        task['password'] = col3.text_input("密码", type="password", value=task.get('password', ''), key=f"pw_{i}")
+        task['freq'] = col4.number_input("周期(天)", value=task.get('freq', 3), key=f"freq_{i}")
+        if col5.button("🗑️ 删除", key=f"del_{i}"):
+            st.session_state.tasks.pop(i)
+            save_config(st.session_state.tasks)
+            st.rerun()
+        updated_tasks.append(task)
 
-if st.button("💾 保存当前所有配置"):
-    save_config(new_task_list)
-    st.success("配置已保存到本地 JSON 文件，下次打开将自动加载！")
+if st.button("💾 保存所有配置"):
+    save_config(updated_tasks)
+    st.success("✅ 配置已持久化保存！即使重启服务也不会丢失。")
 
-if st.button("🚀 统一点执行 (跑完所有流程)"):
-    # 这里的逻辑会依次启动所有启用状态的任务
-    for task in new_task_list:
-        if task['active']:
-            st.write(f"正在跑: {task['name']}...")
-            # 这里的 env 设置会覆盖系统变量
-            env = os.environ.copy()
-            env["EMAIL"] = task['email']
-            env["PASSWORD"] = task['password']
-            subprocess.run(["xvfb-run", "python", task['script']], env=env)
+st.divider()
+
+# --- 执行区 ---
+if st.button("🚀 统一点执行 (一键跑通所有流程)"):
+    with st.status("正在依次执行已启用的任务...", expanded=True) as status:
+        for task in updated_tasks:
+            if task['active']:
+                st.write(f"正在运行: {task['name']}...")
+                env = os.environ.copy()
+                env["EMAIL"] = task['email']
+                env["PASSWORD"] = task['password']
+                
+                # 严格调用原始脚本
+                cmd = ["xvfb-run", "--server-args=-screen 0 1920x1080x24", "python", task['script']]
+                process = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                
+                out_box = st.empty()
+                full_out = ""
+                for line in process.stdout:
+                    full_out += line
+                    out_box.code(full_out)
+                process.wait()
+        status.update(label="✨ 所有流程已跑完，请检查 TG 截图！", state="complete")

@@ -12,114 +12,103 @@ def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
-    return [{"name": "Katabump自动续期", "script": "katabump_renew.py", "mode": "SB增强模式", "email": "", "password": "", "freq": 3, "active": True, "last_run": None}]
+    return [{"name": "Katabump 自动续期任务", "script": "katabump_renew.py", "mode": "SB增强模式 (对应脚本: bypass_seleniumbase.py)", "email": "", "password": "", "freq": 3, "active": True, "last_run": None}]
 
 def save_config(tasks):
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(tasks, f, ensure_ascii=False, indent=2)
 
-# --- 页面配置 ---
-st.set_page_config(page_title="MATRIX 自动化控制中心", layout="wide", initial_sidebar_state="expanded")
+# --- 页面全局配置 ---
+st.set_page_config(page_title="矩阵自动化控制内核", layout="wide")
 
-# 自定义高科技感 CSS
+# 自定义全中文高科技感 CSS
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; color: #00ffc8; }
-    .stButton>button { background-color: #00ffc8; color: black; border-radius: 5px; border: none; font-weight: bold; width: 100%; transition: 0.3s; }
-    .stButton>button:hover { background-color: #ff00ff; color: white; box-shadow: 0 0 15px #ff00ff; }
-    .stExpander { border: 1px solid #00ffc8 !important; background-color: #1a1c24 !important; }
-    code { color: #ff00ff !important; }
-    .status-lamp { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-    .lamp-on { background-color: #00ffc8; box-shadow: 0 0 10px #00ffc8; }
-    .lamp-off { background-color: #555; }
+    .main { background-color: #0b0e14; color: #00e5ff; font-family: 'Microsoft YaHei', sans-serif; }
+    .stButton>button { background: linear-gradient(45deg, #00e5ff, #0055ff); color: white; border: none; font-weight: bold; width: 100%; height: 3em; border-radius: 8px; box-shadow: 0 0 10px rgba(0,229,255,0.3); }
+    .stButton>button:hover { box-shadow: 0 0 20px #00e5ff; transform: translateY(-2px); }
+    .stExpander { border: 1px solid #00e5ff !important; background-color: #12161f !important; border-radius: 10px; }
+    .status-tag { padding: 3px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; }
+    .active-tag { background-color: rgba(0, 255, 128, 0.2); color: #00ff80; border: 1px solid #00ff80; }
+    .standby-tag { background-color: rgba(255, 255, 255, 0.1); color: #888; border: 1px solid #555; }
+    code { background-color: #000 !important; color: #00ff80 !important; border: 1px solid #333; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("⚡ MATRIX 自动化续期内核")
-st.caption("核心版本: 2026.01.29 | 环境: Zeabur Cloud")
+st.title("🛡️ 矩阵自动化控制内核")
+st.caption("版本: 2026.01.29 | 核心架构: 多模式集成分流 | 语言: 简体中文")
 
 if 'tasks' not in st.session_state:
     st.session_state.tasks = load_config()
 
-# --- 侧边栏 ---
-with st.sidebar:
-    st.header("🧬 终端接入")
-    new_name = st.text_input("项目识别码", placeholder="例如: Katabump_01")
-    if st.button("➕ 注入新进程"):
-        st.session_state.tasks.append({
-            "name": new_name, "script": "katabump_renew.py", 
-            "mode": "SB增强模式", "email": "", "password": "", "freq": 3, "active": True, "last_run": None
-        })
-        save_config(st.session_state.tasks)
-        st.rerun()
-
-# --- 主界面 ---
+# --- 任务配置区 ---
 updated_tasks = []
-st.subheader("🛰️ 实时任务轨道")
+st.subheader("🛰️ 任务轨道监控")
 
 for i, task in enumerate(st.session_state.tasks):
-    # 状态灯显示
-    lamp_class = "lamp-on" if task.get('active') else "lamp-off"
-    with st.expander(f"PROJECT: {task['name']}", expanded=True):
-        st.markdown(f'<div><span class="status-lamp {lamp_class}"></span> 进程状态: {"ACTIVE" if task.get("active") else "STANDBY"}</div>', unsafe_allow_html=True)
+    with st.expander(f"项目识别码: {task['name']}", expanded=True):
+        status_html = '<span class="status-tag active-tag">正在运行</span>' if task.get('active') else '<span class="status-tag standby-tag">待命状态</span>'
+        st.markdown(status_html, unsafe_allow_html=True)
         
-        c1, c2, c3, c4, c5 = st.columns([1, 2, 2, 1, 0.5])
+        c1, c2, c3, c4 = st.columns([1, 2, 2, 2])
         
-        # 1. 启用开关
-        task['active'] = c1.checkbox("激活序列", value=task.get('active', True), key=f"active_{i}")
+        # 1. 任务开关
+        task['active'] = c1.checkbox("激活此任务", value=task.get('active', True), key=f"active_{i}")
         
-        # 2. 模式选择 (这决定了 katabump_renew.py 第四步调用哪个逻辑)
-        mode_list = ["单浏览器模式", "SB增强模式", "并行竞争模式"]
-        curr_mode = task.get('mode', "SB增强模式")
-        task['mode'] = c2.selectbox("核心绕过算法 (步骤4驱动)", mode_list, index=mode_list.index(curr_mode) if curr_mode in mode_list else 1, key=f"mode_{i}")
+        # 2. 模式选择 (在这里明确对应脚本名称，让你看得清清楚楚)
+        mode_options = [
+            "单浏览器模式 (对应脚本: simple_bypass.py)", 
+            "SB增强模式 (对应脚本: bypass_seleniumbase.py)", 
+            "并行竞争模式 (对应脚本: bypass.py)"
+        ]
+        curr_mode = task.get('mode', mode_options[1])
+        task['mode'] = c2.selectbox("核心破解算法选择", mode_options, index=mode_options.index(curr_mode) if curr_mode in mode_options else 1, key=f"mode_{i}")
         
-        # 3. 凭据输入
-        task['email'] = c3.text_input("ACCESS_EMAIL", value=task.get('email', ''), key=f"email_{i}")
-        task['password'] = c4.text_input("ACCESS_PASS", type="password", value=task.get('password', ''), key=f"pw_{i}")
+        # 3. 账户凭据
+        task['email'] = c3.text_input("登录邮箱 (Email)", value=task.get('email', ''), key=f"email_{i}")
+        task['password'] = c4.text_input("登录密码 (Password)", type="password", value=task.get('password', ''), key=f"pw_{i}")
         
-        # 4. 删除按钮
-        if c5.button("❌", key=f"del_{i}"):
+        t1, t2, t3, t4 = st.columns([1, 1, 2, 1])
+        task['freq'] = t1.number_input("同步周期 (天)", 1, 30, task.get('freq', 3), key=f"freq_{i}")
+        
+        last = task.get('last_run', "从未运行")
+        next_date = "等待计算"
+        if last != "从未运行":
+            next_date = (datetime.strptime(last, "%Y-%m-%d %H:%M:%S") + timedelta(days=task['freq'])).strftime("%Y-%m-%d")
+        
+        t2.markdown(f"**上次运行:**\n{last}")
+        t3.markdown(f"**下次预定:**\n{next_date}")
+        
+        if t4.button("🗑️ 移除任务", key=f"del_{i}"):
             st.session_state.tasks.pop(i)
             save_config(st.session_state.tasks)
             st.rerun()
 
-        # 频率与时间显示
-        t1, t2, t3 = st.columns([1, 2, 2])
-        task['freq'] = t1.number_input("同步周期(天)", 1, 30, task.get('freq', 3), key=f"freq_{i}")
-        
-        last = task.get('last_run', "NEVER")
-        next_date = "N/A"
-        if last != "NEVER":
-            next_date = (datetime.strptime(last, "%Y-%m-%d %H:%M:%S") + timedelta(days=task['freq'])).strftime("%Y-%m-%d")
-        
-        t2.info(f"📅 上次同步: {last}")
-        t3.warning(f"⏳ 预计下次下行: {next_date}")
-
         updated_tasks.append(task)
 
-if st.button("💾 写入持久化内存"):
-    save_config(updated_tasks)
-    st.success("数据已存入二进制扇区")
-
+# --- 全局控制栏 ---
 st.divider()
+bc1, bc2, bc3 = st.columns([1, 1, 1])
+if bc1.button("💾 保存配置参数"):
+    save_config(updated_tasks)
+    st.success("配置已存入持久化扇区")
 
-# --- 执行区 ---
-if st.button("🚀 启动全域自动化同步"):
+if bc2.button("🚀 启动全域自动化同步"):
     log_area = st.empty()
     with st.status("正在建立神经链接...", expanded=True) as status:
         for task in updated_tasks:
             if task['active']:
-                st.write(f"📡 正在呼叫项目: **{task['name']}**")
+                st.write(f"正在接入项目: **{task['name']}**")
                 
-                # 注入环境变量
+                # 环境变量注入
                 env = os.environ.copy()
                 env["EMAIL"] = task['email']
                 env["PASSWORD"] = task['password']
-                env["BYPASS_MODE"] = task['mode']  # 关键：传给脚本模式名称
+                env["BYPASS_MODE"] = task['mode'] # 传递包含脚本名的完整模式字符串
                 env["PYTHONUNBUFFERED"] = "1"
                 
-                # 执行脚本
+                # 运行主流程脚本
                 cmd = ["xvfb-run", "--server-args=-screen 0 1920x1080x24", "python", "katabump_renew.py"]
                 
                 process = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
@@ -127,16 +116,27 @@ if st.button("🚀 启动全域自动化同步"):
                 full_log = ""
                 for line in process.stdout:
                     full_log += line
-                    # 只显示最新的 15 行日志，保持科技感
-                    display_log = "\n".join(full_log.splitlines()[-15:])
-                    log_area.code(f"USER@MATRIX:~$ \n{display_log}")
+                    # 只显示最新的 20 行日志
+                    display_log = "\n".join(full_log.splitlines()[-20:])
+                    log_area.code(f"管理员终端@矩阵:~$ \n{display_log}")
                 
                 process.wait()
                 if process.returncode == 0:
                     task['last_run'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     save_config(updated_tasks)
-                    st.success(f"✔ 项目 {task['name']} 同步完成")
+                    st.success(f"项目 {task['name']} 处理成功")
                 else:
-                    st.error(f"✖ 项目 {task['name']} 链接中断")
+                    st.error(f"项目 {task['name']} 运行中断")
         
-        status.update(label="🛰️ 所有任务轨道同步完毕", state="complete", expanded=False)
+        status.update(label="所有预定任务同步完毕", state="complete", expanded=False)
+
+with st.sidebar:
+    st.header("🧬 终端管理")
+    new_item = st.text_input("新增项目名", placeholder="输入项目识别码...")
+    if st.button("➕ 注入新进程"):
+        st.session_state.tasks.append({"name": new_item, "script": "katabump_renew.py", "mode": mode_options[1], "email": "", "password": "", "freq": 3, "active": True, "last_run": None})
+        save_config(st.session_state.tasks)
+        st.rerun()
+    
+    st.divider()
+    st.info("💡 提示: 所有的运行截图将保存在 /app/output 目录下。")

@@ -2,8 +2,9 @@ FROM python:3.10-slim
 
 # 1. 设置系统环境变量
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
 
-# 2. 安装系统依赖 (增加了 python3-tk 以解决 MouseInfo 报错)
+# 2. 安装系统依赖
 RUN apt-get update -qq && apt-get install -y -qq \
     xvfb \
     xauth \
@@ -38,15 +39,21 @@ RUN wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-
     && rm -f /tmp/chrome.deb
 
 WORKDIR /app
+
+# 4. 创建输出目录 (必须)
+RUN mkdir -p /app/output && chmod 777 /app/output
+
 COPY . .
 
-# 4. 安装 Python 依赖 (增加了 requests)
+# 5. 安装 Python 依赖
+# 建议先安装 requirements.txt，再补充缺失库
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install pyvirtualdisplay seleniumbase loguru streamlit requests
+RUN pip install --no-cache-dir pyvirtualdisplay seleniumbase loguru streamlit requests apscheduler
 
-# 5. 启动命令 (关键修复点)
-# 逻辑拆解：
-# a. 使用 sh -c 启动 shell 环境
-# b. streamlit 后面加 & 进入后台运行，端口使用 Zeabur 动态分配的 $PORT (默认 8080)
-# c. 使用 while 循环让 scheduler.py 每小时运行一次，实现“即便关掉页面也会自动保活”
-CMD ["sh", "-c", "streamlit run app.py --server.port ${PORT:-8080} --server.address 0.0.0.0 & while true; do python scheduler.py; sleep 3600; done"]
+# 6. 预初始化 SeleniumBase (防止启动时下载慢)
+RUN sbase install chromedriver
+
+# 7. 启动命令
+# 保持你原有的逻辑：Streamlit 后台运行 + 循环执行调度器
+# 端口依然使用 Zeabur/IDX 动态分配的 $PORT
+CMD ["sh", "-c", "streamlit run app.py --server.port ${PORT:-8080} --server.address 0.0.0.0 & while true; do echo '--- 启动调度任务 ---'; python scheduler.py; sleep 3600; done"]

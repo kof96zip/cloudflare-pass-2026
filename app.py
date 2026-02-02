@@ -152,7 +152,7 @@ for i, task in enumerate(updated_tasks):
         if last != "从未运行":
             try:
                 next_dt = (datetime.strptime(last, '%Y-%m-%d %H:%M:%S').replace(tzinfo=bj_tz) + timedelta(days=task['freq']))
-                next_date = next_dt.strftime('%m-%d %H:%M')
+                next_date = next_dt.strftime('%Y-%m-%d %H:%M:%S')
             except: pass
             
         t_time1.markdown(f"上次运行: <span class='highlight-time'>{last}</span>", unsafe_allow_html=True)

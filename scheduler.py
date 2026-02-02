@@ -37,19 +37,20 @@ def run_scheduler():
             should_run = True
         else:
             try:
-                # 增加了日期解析保护：如果碰到 katassv 这种乱码，会进入 except
+                # 增加了日期解析保护
                 last_run_time = datetime.strptime(str(last_run_str), "%Y-%m-%d %H:%M:%S").replace(tzinfo=bj_tz)
                 if now >= (last_run_time + timedelta(days=freq)):
                     should_run = True
             except (ValueError, TypeError):
-                # 关键修复：如果 last_run 是乱码，强制判定为需要运行，从而修复掉乱码数据
+                # 如果 last_run 是乱码，强制判定为需要运行，从而修复数据
                 print(f"[!] 检测到无效的时间记录 '{last_run_str}'，正在强制触发以修复数据...")
                 should_run = True
 
         if should_run:
-            # 3. 提取我们在 UI 上选好的 API 模式
+            # 3. 提取我们在 UI 上选好的 API 模式与脚本名
             selected_mode = task.get('mode', '单浏览器模式 (对应脚本: simple_bypass.py)')
-            print(f"[*] [周期任务启动] 项目: {task['name']} | 挂载 API: {selected_mode}")
+            script_name = task.get('script', 'katabump_renew.py')
+            print(f"[*] [周期任务启动] 项目: {task['name']} | 脚本: {script_name} | 挂载 API: {selected_mode}")
             
             # 4. 环境变量注入
             env = os.environ.copy()
@@ -58,10 +59,14 @@ def run_scheduler():
             env["BYPASS_MODE"] = selected_mode 
             env["PYTHONUNBUFFERED"] = "1"
             
+            # --- 核心改动：为 luneshost.py 注入专项保活变量 ---
+            if script_name == "luneshost.py":
+                env["STAY_TIME"] = str(task.get('stay_time', 10))
+                env["REFRESH_COUNT"] = str(task.get('refresh_count', 3))
+                env["REFRESH_INTERVAL"] = str(task.get('refresh_interval', 5))
+            
             try:
                 # 5. 统一使用 xvfb 环境执行
-                # 注意：这里使用 task.get('script', 'katabump_renew.py') 增加兼容性
-                script_name = task.get('script', 'katabump_renew.py')
                 subprocess.run([
                     "xvfb-run", "--server-args=-screen 0 1920x1080x24", 
                     "python", script_name
@@ -77,8 +82,11 @@ def run_scheduler():
     # 6. 如果有运行记录更新，写回 JSON 文件
     if updated:
         try:
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            # 使用临时文件进行原子性写入，防止损坏
+            temp_file = CONFIG_FILE + ".tmp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(tasks, f, ensure_ascii=False, indent=2)
+            os.replace(temp_file, CONFIG_FILE)
             print("[*] 任务配置已同步更新。")
         except Exception as e:
             print(f"[!] 写入配置文件失败: {e}")

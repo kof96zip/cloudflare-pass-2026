@@ -106,7 +106,7 @@ def run_auto_renew():
             # 第六步：保存成果并报告
             final_img = str(OUTPUT_DIR / "final_result.png")
             sb.save_screenshot(final_img)
-            send_tg_notification("保活成功 ✅", f"Lunes.host 52794 一步到位访问成功！", final_img)
+            send_tg_notification("保活成功 ✅", f"服务器续期访问成功！", final_img)
 
         except Exception as e:
             error_img = str(OUTPUT_DIR / "error.png")
